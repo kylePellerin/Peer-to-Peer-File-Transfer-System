@@ -8,14 +8,9 @@ import java.util.List;
 public class MainServer {
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); // our file storage
 
-
-
-
   public static void main(String[] args) {
     try {
-      //setup the catalog client connection
 
-      //setup the order client connection
 
       PropertyHandlerMapping phm = new PropertyHandlerMapping();
       XmlRpcServer xmlRpcServer;
