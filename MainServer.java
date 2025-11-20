@@ -8,8 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 
 public class MainServer {
-  private static XmlRpcClient catalogClient;
-  private static XmlRpcClient orderClient;
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); // our file storage
 
   public static void main(String[] args) {
