@@ -12,12 +12,16 @@ while True:
     command = input("Please enter a command (Either querry for a filename, or listen quietly): ")
 
     if command == '1' :
+        filename = input("Enter the filename you want to search for: ")
+        peers = server.search_file(filename) # need to implement this function on server side
+        if peers:
+            print(f"Peers with the file '{filename}': {peers}")
+        else:
+            print(f"No peers found with the file '{filename}'.")
     
     elif command == '2' :
-    
-    elif command == '3' :
-    
-    elif command == '4' :
+        print("Listening quietly for incoming requests...")
+        # Implement listening logic here if needed
     
     else:
         print("Command not implemented. Exiting...")
