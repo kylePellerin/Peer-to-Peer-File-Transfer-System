@@ -6,7 +6,7 @@ my_ip = socket.gethostbyname(hostname)
 
 print(f"My IP is: {my_ip}")
 
-server = xmlrpc.client.ServerProxy("http://172.31.37.44:8089")
+server = xmlrpc.client.ServerProxy("http://172.31.37.44:8089") #we need to change this to our new IP address
 
 print("Welcome to the P2P File Sharing Network")
 print("Please offer the main server what files you can share:")
