@@ -1,19 +1,28 @@
 import xmlrpc.client
+import socket
 
-server = xmlrpc.client.Server("http://172.31.37.44:8089") //testing on VM servers
+hostname = socket.gethostname()
+my_ip = socket.gethostbyname(hostname)
+
+print(f"My IP is: {my_ip}")
+
+server = xmlrpc.client.ServerProxy("http://172.31.37.44:8089")
 
 print("Welcome to the P2P File Sharing Network")
 print("Please offer the main server what files you can share:")
-file_list = input("Enter filenames separated by commas: ").split(',')
-file_list = [filename.strip() for filename in file_list]
-server.register_files(file_list) # need to implement this function on server side
+file_input = input("Enter filenames separated by commas: ")
+
+file_list = [filename.strip() for filename in file_input.split(',')]
+
+server.P2P.register_files(my_ip, file_list)  
 
 while True: 
-    command = input("Please enter a command (Either querry for a filename, or listen quietly): ")
+    command = input("Please enter a command (1=Search, 2=Listen): ")
 
     if command == '1' :
         filename = input("Enter the filename you want to search for: ")
-        peers = server.search_file(filename) # need to implement this function on server side
+        peers = server.P2P.search_file(filename)
+        
         if peers:
             print(f"Peers with the file '{filename}': {peers}")
         else:
@@ -21,8 +30,7 @@ while True:
     
     elif command == '2' :
         print("Listening quietly for incoming requests...")
-        # Implement listening logic here if needed
-    
+        # server code here later 
     else:
         print("Command not implemented. Exiting...")
         break

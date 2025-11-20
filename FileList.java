@@ -6,19 +6,19 @@ public class FileList {
         files = new ArrayList<String>(); 
     }
 
-    private void addFile(String fileName) {
+    public void addFile(String fileName) {
         files.add(fileName);
     }
 
-    private void removeFile(String fileName) {
+    public void removeFile(String fileName) {
         files.remove(fileName);
     }
 
-    private boolean hasFile(String fileName) {
+    public boolean hasFile(String fileName) {
         return files.contains(fileName);
     }
 
-    private ArrayList<String> getFiles() {
+    public ArrayList<String> getFiles() {
         return files;
     }
 }
