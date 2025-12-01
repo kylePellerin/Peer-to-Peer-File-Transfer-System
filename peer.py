@@ -13,8 +13,9 @@ print("Please offer the main server what files you can share:")
 file_input = input("Enter filenames separated by commas: ")
 
 file_list = [filename.strip() for filename in file_input.split(',')]
-
+print(f"You are sharing the following files: {file_list}")
 server.P2P.register_files(my_ip, file_list)  
+
 
 while True: 
     command = input("Please enter a command (1=Search, 2=Listen): ")

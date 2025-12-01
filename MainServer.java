@@ -24,7 +24,7 @@ public class MainServer {
     }
   }
 
-  public String register_files(String clientIp, Object[] fileList) {
+  public String register_files(String clientIp, Vector<String> fileList) {
         System.out.println("Register request from " + clientIp);
         
         synchronized(fileLists) {
@@ -41,6 +41,7 @@ public class MainServer {
         }
         return "Files Registered";
     }
+    
 
     public Vector<String> search_file(String filename) {
         System.out.println("Search request for: " + filename);
