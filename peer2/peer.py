@@ -56,12 +56,12 @@ while True:
     print("\n--- MENU ---")
     print("1. SEARCH for a file")
     print("2. DOWNLOAD a file")
-    print("3. Listen quietly for incoming requests")
+    print("3. Listen quietly (Log Mode)")
     print("4. Exit")
     
     command = input("Selection: ")
 
-    if command == '1': #search
+    if command == '1':
         filename = input("Enter filename to search: ")
         try:
             peers = server.P2P.search_file(filename)
@@ -72,7 +72,7 @@ while True:
         except Exception as e:
             print(f"Search failed: {e}")
 
-    elif command == '2': 
+    elif command == '2':
         # get file
         target_ip = input("Enter Peer IP: ")
         target_port = input("Enter Peer Port (e.g. 8001): ")
@@ -85,7 +85,7 @@ while True:
         try:
             response = requests.get(url)
             if response.status_code == 200: #request worked and we can get it
-                save_name = "downloaded_" + filename #may need to change this logic when we have partial files 
+                save_name = "downloaded_" + filename
                 with open(save_name, 'wb') as f:
                     f.write(response.content)
                 print(f"SUCCESS! Saved as '{save_name}'")
@@ -94,13 +94,13 @@ while True:
         except Exception as e:
             print(f"Download error: {e}")
 
-    elif command == '3': #listen
+    elif command == '3':
         print(f"Listening on port {my_port}... (Press Ctrl+C to stop)")
         # just sleep forever to keep the flask thread alive
         while True:
             time.sleep(1)
             
-    elif command == '4': #exit
+    elif command == '4':
         print("Exiting...")
         break
     else:
