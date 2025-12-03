@@ -7,46 +7,69 @@ import java.util.Vector;
 public class MainServer {
   // FIX 1: This MUST be static so the data survives between requests
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); 
+  private static String backupServerIp = null;
+  private static int backupServerPort = 0;
 
   public static void main(String[] args) {
     try {
-      System.out.println("Attempting to start Server...");
-      WebServer server = new WebServer(8089); 
-      
-      XmlRpcServer xmlRpcServer = server.getXmlRpcServer();
-      PropertyHandlerMapping phm = new PropertyHandlerMapping();
-      
-      // This tells the server to make a new MainServer object for every request
-      phm.addHandler("P2P", MainServer.class);
-      
-      xmlRpcServer.setHandlerMapping(phm);
-      server.start();
-      System.out.println("XML-RPC server started on 8089");
+    int mainPort = 8089; // or whatever value we want to use here
+    if args.length > 0 {
+        mainPort = Integer.parseInt(args[0]);
+    }
+    if (args.length == 3) {
+        backupServerIp = args[1];
+        backupServerPort = Integer.parseInt(args[2]);
+        System.out.println("Backup server set to " + backupServerIp + ":" + backupServerPort);
+    }else {
+        System.out.println("No backup server configured, running as a standalone.");
+    }
+    System.out.println("Attempting to start Server...");
+    WebServer server = new WebServer(mainPort); 
+    
+    XmlRpcServer xmlRpcServer = server.getXmlRpcServer();
+    PropertyHandlerMapping phm = new PropertyHandlerMapping();
+    
+    // This tells the server to make a new MainServer object for every request
+    phm.addHandler("P2P", MainServer.class);
+    
+    xmlRpcServer.setHandlerMapping(phm);
+    server.start();
+    System.out.println("XML-RPC server started on " + mainPort);
     } catch (Exception e) {
       System.err.println("Server exception: " + e);
     }
   }
 
-  // FIX 2: Change Vector<String> to Object[] for better Python compatibility
   public String register_files(String clientIp, Object[] fileList) {
         System.out.println("Register request from " + clientIp);
-        
+
+        // 1. Update LOCAL state
         synchronized(fileLists) {
             for (Object fileObj : fileList) {
                 String filename = (String) fileObj;
-                
-                // Create the file entry if it doesn't exist
                 if (!fileLists.containsKey(filename)) {
                     fileLists.put(filename, new FileList());
-                    System.out.println("   New file tracked: " + filename);
                 }
-                
-                // Add the peer to the file entry
-                // NOTE: Ensure your FileList.java has a method 'addPeer' or 'addFile'
                 fileLists.get(filename).addFile(clientIp);
-                System.out.println("   Added " + clientIp + " to " + filename);
             }
         }
+        if (backupServerIp != null) {
+            try {
+                System.out.println("Replicating to backup");
+                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+                config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
+                XmlRpcClient client = new XmlRpcClient();
+                client.setConfig(config);
+                // call method on backup server
+                Object[] params = new Object[]{clientIp, fileList};
+                client.execute("P2P.register_files", params);
+                System.out.println("Replication success.");
+            } catch (Exception e) {
+                System.out.println("Replication FAILED: " + e.getMessage());
+                // don't crash just log because primary alive
+            }
+        }
+
         return "Files Registered";
     }
     
@@ -56,7 +79,6 @@ public class MainServer {
         
         synchronized(fileLists) {
             if (fileLists.containsKey(filename)) {
-                // Ensure FileList.java has a method 'getFiles' that returns a List or Vector
                 return new Vector<String>(fileLists.get(filename).getFiles());
             } else {
                 return new Vector<String>(); 
