@@ -1,6 +1,9 @@
 import org.apache.xmlrpc.webserver.WebServer;
 import org.apache.xmlrpc.server.XmlRpcServer;
 import org.apache.xmlrpc.server.PropertyHandlerMapping;
+import org.apache.xmlrpc.client.XmlRpcClient;
+import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -13,7 +16,7 @@ public class MainServer {
   public static void main(String[] args) {
     try {
     int mainPort = 8089; // or whatever value we want to use here
-    if args.length > 0 {
+    if (args.length > 0) {
         mainPort = Integer.parseInt(args[0]);
     }
     if (args.length == 3) {
@@ -43,8 +46,7 @@ public class MainServer {
   public String register_files(String clientIp, Object[] fileList) {
         System.out.println("Register request from " + clientIp);
 
-        // 1. Update LOCAL state
-        synchronized(fileLists) {
+        synchronized(fileLists) { //update main 
             for (Object fileObj : fileList) {
                 String filename = (String) fileObj;
                 if (!fileLists.containsKey(filename)) {
@@ -53,7 +55,7 @@ public class MainServer {
                 fileLists.get(filename).addFile(clientIp);
             }
         }
-        if (backupServerIp != null) {
+        if (backupServerIp != null) { //if we have a backoup were gonna write to it
             try {
                 System.out.println("Replicating to backup");
                 XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
