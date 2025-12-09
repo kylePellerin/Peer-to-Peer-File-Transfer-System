@@ -6,13 +6,14 @@ import org.apache.xmlrpc.client.XmlRpcClientConfigImpl;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Vector;
+import java.util.HashSet;
 
 public class MainServer {
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); 
-  private static Set<String> blackList = new HashSet<String>();
+  private static HashSet<String> blackList = new HashSet<String>();
   private static String backupServerIp = null;
-  private static final int backupServerPort = 8642;
-  private static final int mainPort = 8641;
+  private static int backupServerPort = 8642;
+  private static int mainPort = 8641;
 
 
   public static void main(String[] args) {
