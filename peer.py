@@ -127,7 +127,7 @@ while True:
                     f.write(response.content)
                 print(f"SUCCESS! Saved as '{save_name}'")
                 safe_register(my_ip, [save_name.strip()]) #register new file with server
-                report = int(input("Report this file Transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
+                report = int(input("Report this as a malicious file transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
             else:
                 print(f"Failed. Status: {response.status_code}")
         except Exception as e:
