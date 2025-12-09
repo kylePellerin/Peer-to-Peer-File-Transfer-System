@@ -5,103 +5,135 @@ import time
 import requests
 import os
 from flask import Flask, send_from_directory
+PRIMARY_IP = "54.205.35.150" 
+BACKUP_IP  = "54.226.158.73" 
+PRIMARY_URL = f"http://{PRIMARY_IP}:8641"
+BACKUP_URL  = f"http://{BACKUP_IP}:8642"
 
+SERVER_PORT = 8643  #all peers on this random value
+
+# Create connections
+primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
+backup_server  = xmlrpc.client.ServerProxy(BACKUP_URL)
+
+def safe_register(ip, file_list):
+    """ Tries Primary. If fail, tries Backup. """
+    try:
+        print(f"Registering with Primary ({PRIMARY_IP})...")
+        primary_server.P2P.register_files(ip, file_list)
+        print("Success: Connected to Primary.")
+    except Exception as e:
+        print(f"Primary failed. Switching to BACKUP ({BACKUP_IP})...")
+        try:
+            backup_server.P2P.register_files(ip, file_list)
+            print("Success: Connected to Backup.")
+        except Exception:
+            print("CRITICAL: Both servers are down.")
+
+def safe_search(filename):
+    """ Tries Primary. If fail, tries Backup. """
+    try:
+        return primary_server.P2P.search_file(filename)
+    except Exception:
+        print("Primary unreachable. Searching on Backup...")
+        try:
+            return backup_server.P2P.search_file(filename)
+        except Exception:
+            print("Both servers down.")
+            return []
 app = Flask(__name__)
-
-# we serve files from the current folder
 FILE_DIRECTORY = "." 
 
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
-        # Check if file exists before trying to send
         if os.path.exists(filename):
-            print(f"\n[!] Incoming request: Sending '{filename}' to a peer...")
+            print(f"\n[!] Peer requested '{filename}'. Sending...")
             return send_from_directory(FILE_DIRECTORY, filename, as_attachment=True)
         else:
             return "File not found", 404
     except Exception as e:
         return str(e), 500
 
-def start_flask_server(port):
-    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False) # 0.0.0.0 for listen to anyone
+def start_flask_server():
+    # We listen on 0.0.0.0 to allow connections from other AWS machines
+    try:
+        app.run(host='0.0.0.0', port=SERVER_PORT, debug=False, use_reloader=False)
+    except Exception as e:
+        print(f"ERROR starting file server: {e}")
 
 hostname = socket.gethostname()
 my_ip = socket.gethostbyname(hostname)
-print(f"My IP is: {my_ip}")
 
-my_port = int(input("Enter the PORT you want to listen on: ")) #hardcose for 8089 with one
-server_thread = threading.Thread(target=start_flask_server, args=(my_port,))
-server_thread.daemon = True # ensures thread dies when program closed
+# start the File Server background thread
+server_thread = threading.Thread(target=start_flask_server)
+server_thread.daemon = True 
 server_thread.start()
+time.sleep(1) # give flask a second to start
 
-time.sleep(1) #needed this delay to start flask without issues
+print(f"\n--- P2P NODE STARTED ---")
+print(f"My IP: {my_ip}")
+print(f"Listening on Port: {SERVER_PORT}")
 
-server = xmlrpc.client.ServerProxy("http://localhost:8089") #we need to change this to our new IP address eventually
+print("\nStep 1: Share Files")
+file_input = input("Enter filenames (comma separated): ")
+file_list = [f.strip() for f in file_input.split(',')]
 
-print("Welcome to the P2P File Sharing Network")
-print("Please offer the main server what files you can share:")
-file_input = input("Enter filenames separated by commas: ")
-
-file_list = [filename.strip() for filename in file_input.split(',')]
-print(f"You are sharing the following files: {file_list}")
-try:
-    server.P2P.register_files(my_ip, file_list)
-    print("Files registered successfully with the main server.")
-except Exception as e:
-    print(f"Error registering files: {e}")
-
+safe_register(my_ip, file_list)
 
 while True: 
     print("\n--- MENU ---")
     print("1. SEARCH for a file")
     print("2. DOWNLOAD a file")
-    print("3. Listen quietly for incoming requests")
-    print("4. Exit")
+    print("3. LISTEN for incoming requests")
+    print("4. EXIT")
     
     command = input("Selection: ")
 
-    if command == '1': #search
+    if command == '1':
         filename = input("Enter filename to search: ")
-        try:
-            peers = server.P2P.search_file(filename)
-            if peers:
-                print(f"Peers with '{filename}': {peers}")
-            else:
-                print(f"No peers found for '{filename}'.")
-        except Exception as e:
-            print(f"Search failed: {e}")
+        peers = safe_search(filename)
+        if peers:
+            print(f"Peers with '{filename}': {peers}")
+        else:
+            print(f"No peers found.")
 
-    elif command == '2': 
-        # get file
-        target_ip = input("Enter Peer IP: ")
-        target_port = input("Enter Peer Port (e.g. 8001): ")
-        filename = input("Enter Filename: ")
-
-        # make url based on flask route
-        url = f"http://{target_ip}:{target_port}/download/{filename}"
+    elif command == '2':
+        filename = input("Enter Filename to download: ")
+    
+        print(f"Locating '{filename}'...")
+        potential_peers = safe_search(filename) #call our mainserver method
         
-        print(f"Downloading from {url}...")
+        if not potential_peers:
+            print("File not found on network.")
+            continue
+        print(f"\nFound {len(potential_peers)} source(s):")
+        for i, peer_ip in enumerate(potential_peers):
+            print(f"[{i}] {peer_ip}")
         try:
-            response = requests.get(url)
-            if response.status_code == 200: #request worked and we can get it
-                save_name = "downloaded_" + filename #may need to change this logic when we have partial files 
+            selection = int(input("\nEnter index of peer: "))
+            target_ip = potential_peers[selection]
+        except (ValueError, IndexError):
+            print("Invalid selection.")
+            continue
+            
+        url = f"http://{target_ip}:{SERVER_PORT}/download/{filename}"
+        print(f"Downloading from {target_ip}...")
+        
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                save_name = "downloaded_" + filename
                 with open(save_name, 'wb') as f:
                     f.write(response.content)
                 print(f"SUCCESS! Saved as '{save_name}'")
             else:
-                print(f"Failed. Peer sent status code: {response.status_code}")
+                print(f"Failed. Status: {response.status_code}")
         except Exception as e:
-            print(f"Download error: {e}")
-
-    elif command == '3': #listen
-        print(f"Listening on port {my_port}... (Press Ctrl+C to stop)")
-        # just sleep forever to keep the flask thread alive
+            print(f"Download Error: {e}")
+    elif command == '3':
+        print(f"Listening... (Press Ctrl+C to stop)")
         while True:
             time.sleep(1)
-            
-    elif command == '4': #exit
-        print("Exiting...")
+    elif command == '4':
         break
-    else:
-        print("Invalid command.")
