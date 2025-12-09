@@ -9,6 +9,7 @@ import java.util.Vector;
 
 public class MainServer {
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); 
+  private static Set<String> blackList = new HashSet<String>();
   private static String backupServerIp = null;
   private static int backupServerPort = 0;
   private static final int MAIN_SERVER_PORT = 8641;
