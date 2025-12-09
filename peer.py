@@ -17,7 +17,6 @@ primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
 backup_server  = xmlrpc.client.ServerProxy(BACKUP_URL)
 
 def safe_register(ip, file_list):
-    """ Tries Primary. If fail, tries Backup. """
     try:
         print(f"Registering with Primary ({PRIMARY_IP})...")
         primary_server.P2P.register_files(ip, file_list)
@@ -31,7 +30,7 @@ def safe_register(ip, file_list):
             print("CRITICAL: Both servers are down.")
 
 def safe_search(filename):
-    """ Tries Primary. If fail, tries Backup. """
+    #Tries Primary If fail, tries Backup.
     try:
         return primary_server.P2P.search_file(filename)
     except Exception:
@@ -123,10 +122,12 @@ while True:
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
-                save_name = "downloaded_" + filename
+                save_name = filename
                 with open(save_name, 'wb') as f:
                     f.write(response.content)
                 print(f"SUCCESS! Saved as '{save_name}'")
+                safe_register(my_ip, [save_name.strip()]) #register new file with server
+                report = int(input("Report this file Transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
             else:
                 print(f"Failed. Status: {response.status_code}")
         except Exception as e:
