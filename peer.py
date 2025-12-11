@@ -148,7 +148,7 @@ while True:
                 safe_register(my_ip, [save_name.strip()]) #register new file with server
                 file_list.append(save_name.strip())
                 report = int(input("Report this as a malicious file transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
-                if report. == 1:
+                if report == 1:
                     print("Reporting... Peers") #architecture for reporting
                     safe_report(target_ip)
             else:
