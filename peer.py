@@ -9,8 +9,10 @@ PRIMARY_IP = "54.205.35.150"
 BACKUP_IP  = "54.226.158.73" 
 PRIMARY_URL = f"http://{PRIMARY_IP}:8641"
 BACKUP_URL  = f"http://{BACKUP_IP}:8642"
-
-SERVER_PORT = 8643  #all peers on this random value
+if len(sys.argv) > 1:
+    SERVER_PORT = int(sys.argv[1])
+else:
+    SERVER_PORT = 8643  #all peers on this random value unless specifed (for scripting)
 
 # Create connections
 primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
