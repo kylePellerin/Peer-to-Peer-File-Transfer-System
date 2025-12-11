@@ -129,6 +129,7 @@ while True:
             print(f"[{i}] {p}")
             
         try:
+            #will add multi peer sharing here
             selection = int(input("Select peer index: "))
             target_peer_id = potential_peers[selection]
             target_ip, target_port = target_peer_id.split(':')
