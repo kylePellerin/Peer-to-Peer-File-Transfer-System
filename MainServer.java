@@ -7,6 +7,8 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Vector;
 import java.util.HashSet;
+import java.util.*;
+import java.util.ArrayList;
 
 public class MainServer {
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); 
@@ -25,6 +27,7 @@ public class MainServer {
         backupServerIp = args[1];
         backupServerPort = Integer.parseInt(args[2]);
         System.out.println("Backup server set to " + backupServerIp + ":" + backupServerPort);
+        syncWithBackup(); //if backup has logs we need to get them in case of main restart
     }else {
         System.out.println("No backup server configured, running as a standalone.");
     }
@@ -44,7 +47,63 @@ public class MainServer {
       System.err.println("Server exception: " + e);
     }
   }
-  private boolean isBlacklisted(String ip) {
+
+  private static void syncWithBackup() { //if the main goes down and backup logs stuff we need to update main when it comes back online so we call this
+      try {
+          System.out.println("Attempting to sync state from Backup...");
+          XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+          config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
+          XmlRpcClient client = new XmlRpcClient();
+          client.setConfig(config);
+
+          Object response = client.execute("P2P.get_all_files", new Object[]{});
+          if (response instanceof Map) { //basically rebuild from the backups data strcutres
+              Map<String, Object[]> rawFiles = (Map<String, Object[]>) response;
+              synchronized(fileLists) {
+                  for (String filename : rawFiles.keySet()) {
+                      Object[] ips = rawFiles.get(filename);
+                      FileList fl = new FileList();
+                      for (Object ip : ips) {
+                          fl.addFile((String)ip);
+                      }
+                      fileLists.put(filename, fl);
+                  }
+              }
+              System.out.println("Synced " + rawFiles.size() + " files from backup.");
+          }
+
+          Object[] blockedUsers = (Object[]) client.execute("P2P.get_black_list", new Object[]{});
+          synchronized(blackList) { //rebuild blacklist from backup
+              for (Object ip : blockedUsers) {
+                  blackList.add((String)ip);
+              }
+          }
+          System.out.println("Synced " + blockedUsers.length + " blacklisted users from backup.");
+
+      } catch (Exception e) {
+          System.out.println("Sync Failed (Backup might be down or empty): " + e.getMessage());
+          //if backup down or empty we just start as normal
+      }
+  }  
+  public Map<String, Object[]> get_all_files() { //get all files from filelist for the sync method above
+      System.out.println("Sync request received: Sending file list.");
+      Map<String, Object[]> exportData = new HashMap<>();
+      synchronized(fileLists) {
+          for (String filename : fileLists.keySet()) {
+              ArrayList<String> ips = fileLists.get(filename).getFiles();
+              exportData.put(filename, ips.toArray());
+          }
+      }
+      return exportData;
+  }
+
+  public Object[] get_black_list() { //get all blacklisted ips from blacklist for the sync method above
+      System.out.println("Sync request received: Sending blacklist.");
+      synchronized(blackList) {
+          return blackList.toArray();
+      }
+  }
+  private boolean isBlacklisted(String ip) { //check if ip is blacklisted
       synchronized(blackList) {
           return blackList.contains(ip);
       }
