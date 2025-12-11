@@ -1,0 +1,22 @@
+ * Serving Flask app 'peer'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8702
+ * Running on http://139.140.235.144:8702
+[33mPress CTRL+C to quit[0m
+
+--- P2P NODE STARTED ---
+My IP: 139.140.235.144
+Listening on Port: 8702
+
+Step 1: Share Files
+Enter filenames (comma separated): Registering with Primary (54.205.35.150)...
+Success: Connected to Primary.
+
+--- MENU ---
+1. SEARCH for a file
+2. DOWNLOAD a file
+3. LISTEN for incoming requests
+4. EXIT
+Selection: 
