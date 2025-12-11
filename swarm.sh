@@ -17,21 +17,12 @@ count=1
 for IP in "${NODES[@]}"; do
     echo "[$count/5] Deploying to $IP..."
     
-    # 1. Kill any old peer running
     ssh -o StrictHostKeyChecking=no $USER@$IP "pkill -f peer.py" 2>/dev/null
 
-    # 2. Create dummy file content
     FILENAME="data${count}.txt"
     ssh -o StrictHostKeyChecking=no $USER@$IP "echo 'Hello from $IP' > $FILENAME"
-
-    # 3. Copy the script
     scp -o StrictHostKeyChecking=no peer.py $USER@$IP:~/
-
-    # 4. Install requirements (quietly)
-    ssh -o StrictHostKeyChecking=no $USER@$IP "pip3 install flask requests > /dev/null 2>&1"
-
-    # 5. Launch in background!
-    # We pipe the filename so it auto-registers
+    ssh -o StrictHostKeyChecking=no $USER@$IP "pip3 install flask requests urllib3==1.26.15 > /dev/null 2>&1"
     ssh -o StrictHostKeyChecking=no $USER@$IP "printf '$FILENAME\n' | nohup python3 peer.py > peer.log 2>&1 &"
 
     echo "   -> Peer $count is LIVE sharing '$FILENAME'"
