@@ -138,8 +138,8 @@ while True:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 if filename in file_list:
-                    overwrite = int(input("File already exists locally, you will overwrite is this okay? (1=Yes, 0=No): ")) #add overwrite prompt later
-                    if not overwrite:
+                    overwrite = int(input("File already exists locally, you will overwrite is this okay? (1=Overwrite, 0=Do Not Overwrite): ")) #add overwrite prompt later
+                    if overwrite == 0:
                         print("Download cancelled.")
                         continue
 
@@ -151,7 +151,7 @@ while True:
                 file_list.append(save_name.strip())
                 report = int(input("Report this as a malicious file transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
                 if report == 1:
-                    print("Reporting... Peers") #architecture for reporting
+                    print("Reporting Peer") #architecture for reporting
                     safe_report(target_ip)
             else:
                 print(f"Failed. Status: {response.status_code}")
