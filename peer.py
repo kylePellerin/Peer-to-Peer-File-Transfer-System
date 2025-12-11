@@ -61,6 +61,19 @@ def start_flask_server():
     except Exception as e:
         print(f"ERROR starting file server: {e}")
 
+def safe_report(peer_ip):
+    # Report a malicious file transfer to the network
+    try:
+        primary_server.P2P.report_user(peer_ip)
+        print("Reported to Primary.")
+    except Exception:
+        print("Primary unreachable. Reporting on Backup...")
+        try:
+            backup_server.P2P.report_user(peer_ip)
+            print("Reported to Backup.")
+        except Exception:
+            print("Both servers down. Report failed.")
+
 hostname = socket.gethostname()
 my_ip = socket.gethostbyname(hostname)
 
@@ -123,7 +136,11 @@ while True:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 if filename in file_list:
-                    print("File already exists locally, you will overwrite") #add overwrite prompt later
+                    overwrite = int(input("File already exists locally, you will overwrite is this okay? (1=Yes, 0=No): ")) #add overwrite prompt later
+                    if not overwrite:
+                        print("Download cancelled.")
+                        continue
+
                 save_name = filename
                 with open(save_name, 'wb') as f:
                     f.write(response.content)
@@ -131,6 +148,9 @@ while True:
                 safe_register(my_ip, [save_name.strip()]) #register new file with server
                 file_list.append(save_name.strip())
                 report = int(input("Report this as a malicious file transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
+                if report. == 1:
+                    print("Reporting... Peers") #architecture for reporting
+                    safe_report(target_ip)
             else:
                 print(f"Failed. Status: {response.status_code}")
         except Exception as e:

@@ -44,8 +44,17 @@ public class MainServer {
       System.err.println("Server exception: " + e);
     }
   }
+  private boolean isBlacklisted(String ip) {
+      synchronized(blackList) {
+          return blackList.contains(ip);
+      }
+  }
 
   public String register_files(String clientIp, Object[] fileList) {
+    if (isBlacklisted(clientIp)) {
+            System.out.println("Blocked register request from blacklisted IP: " + clientIp);
+            return "Error: You are blacklisted.";
+        }
         System.out.println("Register request from " + clientIp);
 
         synchronized(fileLists) { //update main 
@@ -77,6 +86,32 @@ public class MainServer {
         return "Files Registered";
     }
     
+public String report_user(String badUserIp) {
+        System.out.println("REPORT RECEIVED: User " + badUserIp + " has been reported.");
+        
+        synchronized(blackList) {
+            if (!blackList.contains(badUserIp)) {
+                blackList.add(badUserIp);
+                System.out.println("User " + badUserIp + " added to blacklist.");
+            }
+        }
+
+        if (backupServerIp != null) { 
+            try {
+                System.out.println("Replicating blacklist to backup...");
+                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+                config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
+                XmlRpcClient client = new XmlRpcClient();
+                client.setConfig(config);
+                Object[] params = new Object[]{badUserIp};
+                client.execute("P2P.report_user", params);
+            } catch (Exception e) {
+                System.out.println("Blacklist Replication FAILED: " + e.getMessage());
+            }
+        }
+        
+        return "User Blacklisted";
+    }
 
     public Vector<String> search_file(String filename) {
         System.out.println("Search request for: " + filename);
