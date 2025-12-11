@@ -1,42 +1,43 @@
 #!/bin/bash
 
-# Clean up previous run
-rm -rf swarm_peer*
-mkdir -p swarm_logs
+# A diverse list of 5 Public IPs (Excluding the servers)
+NODES=(
+    "107.23.190.249"  # Virginia (Peer 1)
+    "3.144.239.184"   # Ohio     (Peer 2)
+    "54.151.0.141"    # Cali     (Peer 3)
+    "35.159.30.5"     # Frankfurt(Peer 4)
+    "35.72.34.224"    # Tokyo    (Peer 5)
+)
 
-echo "--- LAUNCHING P2P SWARM ---"
+USER="kpellerin"
 
-# Launch 5 Peers
-for i in {1..5}
-do
-   # 1. Create a dedicated folder for this peer
-   FOLDER="swarm_peer$i"
-   mkdir -p $FOLDER
-   
-   # 2. Copy the code into it
-   cp peer.py $FOLDER/
-   
-   # 3. Create a unique file for them to share
-   FILENAME="data_$i.txt"
-   echo "This is the content of data_$i" > "$FOLDER/$FILENAME"
-   
-   # 4. Pick a unique port (8700, 8701, etc)
-   PORT=$((8700 + i))
-   
-   # 5. RUN IT IN THE BACKGROUND
-   # We pipe the inputs: "FILENAME" + newline + "3" (Listen Mode)
-   # We redirect output to a log file so it doesn't clutter your screen
-   cd $FOLDER
-   printf "$FILENAME\n3\n" | python3 peer.py $PORT > ../swarm_logs/peer$i.log 2>&1 &
-   
-   # Save the Process ID so we can kill it later
-   PID=$!
-   echo "Started Peer $i on Port $PORT sharing '$FILENAME' (PID: $PID)"
-   
-   cd ..
-   sleep 1
+echo "--- DEPLOYING GLOBAL SWARM ---"
+
+count=1
+for IP in "${NODES[@]}"; do
+    echo "[$count/5] Deploying to $IP..."
+    
+    # 1. Kill any old peer running
+    ssh -o StrictHostKeyChecking=no $USER@$IP "pkill -f peer.py" 2>/dev/null
+
+    # 2. Create dummy file content
+    FILENAME="data${count}.txt"
+    ssh -o StrictHostKeyChecking=no $USER@$IP "echo 'Hello from $IP' > $FILENAME"
+
+    # 3. Copy the script
+    scp -o StrictHostKeyChecking=no peer.py $USER@$IP:~/
+
+    # 4. Install requirements (quietly)
+    ssh -o StrictHostKeyChecking=no $USER@$IP "pip3 install flask requests > /dev/null 2>&1"
+
+    # 5. Launch in background!
+    # We pipe the filename so it auto-registers
+    ssh -o StrictHostKeyChecking=no $USER@$IP "printf '$FILENAME\n' | nohup python3 peer.py > peer.log 2>&1 &"
+
+    echo "   -> Peer $count is LIVE sharing '$FILENAME'"
+    ((count++))
 done
 
-echo "--------------------------------"
-echo "Swarm is live! Check 'swarm_logs/' to see their status."
-echo "Run './kill_swarm.sh' to stop them."
+echo "-----------------------------------"
+echo "Swarm is Active. You can now run 'python3 peer.py' locally and SEARCH for:"
+echo "data_from_peer1.txt ... data_from_peer5.txt"
