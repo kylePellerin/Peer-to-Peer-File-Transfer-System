@@ -39,7 +39,7 @@ def safe_register(peer_id, file_list):
         except Exception:
             print("CRITICAL: Both servers are down.")
 
-def safe_register_chunks(peer_id, file_name) # to register chunked files, keeping old to ensure not to break anything
+def build_chunks(file_name): # to register chunked files, keeping old to ensure not to break anything
     chunks = []
     with open(file_name, 'rb') as f:
         i = 0
@@ -53,6 +53,13 @@ def safe_register_chunks(peer_id, file_name) # to register chunked files, keepin
             chunks.append(chunk_filename)
             i += 1
     return chunks
+
+def reassemble_file(filename, chunk_count):
+    with open(filename, 'wb') as out:
+        for i in range(chunk_count):
+            part = f"{filename}.part{i}"
+            with open(part, 'rb') as p:
+                out.write(p.read())
 
 def safe_search(filename):
     try:
@@ -115,7 +122,15 @@ else:
     # If run by automation script, read from pipe
     file_input = sys.stdin.readline().strip()
 
-file_list = [f.strip() for f in file_input.split(',')]
+#file_list = [f.strip() for f in file_input.split(',')]
+file_list = []
+for file in file_input.split(','):
+    file = file.strip()
+    if os.path.exists(file):
+        file_parts = build_chunks(file)
+        file_list.extend(file_parts)
+    else:
+        print(f"Warning: File '{file}' does not exist and will be skipped.")
 safe_register(MY_PEER_ID, file_list)
 
 while True: 
@@ -137,7 +152,16 @@ while True:
 
     elif command == '2':
         filename = input("Enter Filename: ")
-        potential_peers = safe_search(filename)
+        # potential_peers = safe_search(filename) old now we are using chunked
+        chunks = [] 
+        i = 0
+        while True: 
+            chunk_name = f"{filename}.part{i}"
+            potential_peers = safe_search(chunk_name)
+            if not potential_peers:
+                break
+            chunks.append((chunk_name, potential_peers))
+            i += 1
         if not potential_peers:
             print("Not found.")
             continue
@@ -146,15 +170,32 @@ while True:
             print(f"[{i}] {p}")
             
         try:
-            #will add multi peer sharing here
             selection = int(input("Select peer index: "))
             target_peer_id = potential_peers[selection]
             target_ip, target_port = target_peer_id.split(':')
         except:
             continue
-            
-        url = f"http://{target_ip}:{target_port}/download/{filename}"
-        print(f"Downloading from {url}...")
+
+        #downloading chunked files from peers
+        for chunk_name, peers in chunks:
+            print(f"Downloading chunk {chunk_name}...")
+            for peer in peers:
+                target_ip, target_port = peer.split(':')
+                url = f"http://{target_ip}:{target_port}/download/{chunk_name}"
+                print(f"Trying {url}...")
+                try:
+                    r = requests.get(url, timeout=10)
+                    if r.status_code == 200:
+                        with open(chunk_name, 'wb') as f: f.write(r.content)
+                        print(f"Downloaded chunk {chunk_name} from {peer}")
+                        break
+                except Exception as e:
+                    print(f"Error: {e}")
+            else:
+                print(f"Failed to download chunk {chunk_name} from all peers.")
+                continue   
+        #url = f"http://{target_ip}:{target_port}/download/{filename}" old logic
+        #print(f"Downloading from {url}...")
         try:
             r = requests.get(url, timeout=10)
             if r.status_code == 200:
