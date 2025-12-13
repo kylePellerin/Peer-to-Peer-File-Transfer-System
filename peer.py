@@ -17,6 +17,8 @@ SERVER_PORT = 8643
 primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
 backup_server  = xmlrpc.client.ServerProxy(BACKUP_URL)
 
+chunk_size = 256 * 1024  # 256KB
+
 def get_public_ip():
     """ ASK AMAZON FOR MY REAL PUBLIC IP """
     try:
@@ -36,6 +38,9 @@ def safe_register(peer_id, file_list):
             print("Success: Connected to Backup.")
         except Exception:
             print("CRITICAL: Both servers are down.")
+
+def safe_register_chunks(peer_id, file_name, total_chunks): # to register chunked files, keeping old to ensure not to break anything
+
 
 def safe_search(filename):
     try:
