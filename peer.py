@@ -39,8 +39,20 @@ def safe_register(peer_id, file_list):
         except Exception:
             print("CRITICAL: Both servers are down.")
 
-def safe_register_chunks(peer_id, file_name, total_chunks): # to register chunked files, keeping old to ensure not to break anything
-
+def safe_register_chunks(peer_id, file_name) # to register chunked files, keeping old to ensure not to break anything
+    chunks = []
+    with open(file_name, 'rb') as f:
+        i = 0
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            chunk_filename = f"{file_name}.part{i}"
+            with open(chunk_filename, 'wb') as chunk_file:
+                chunk_file.write(chunk)
+            chunks.append(chunk_filename)
+            i += 1
+    return chunks
 
 def safe_search(filename):
     try:
