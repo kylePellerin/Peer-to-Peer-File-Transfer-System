@@ -162,16 +162,16 @@ while True:
                 break
             chunks.append((chunk_name, potential_peers))
             i += 1
-        if not potential_peers:
+        if not chunks:
             print("Not found.")
             continue
             
-        for i, p in enumerate(potential_peers):
-            print(f"[{i}] {p}")
+        #for i, p in enumerate(potential_peers):
+        #    print(f"[{i}] {p}")
             
-        try:
-            selection = int(input("Select peer index: "))
-            target_peer_id = potential_peers[selection]
+        #try:
+        #    selection = int(input("Select peer index: "))
+        #    target_peer_id = potential_peers[selection]
             target_ip, target_port = target_peer_id.split(':')
         except:
             continue
@@ -193,20 +193,26 @@ while True:
                     print(f"Error: {e}")
             else:
                 print(f"Failed to download chunk {chunk_name} from all peers.")
-                continue   
+                continue 
+        reassemble_file(filename, len(chunks))
+        print(f"Reassembled file {filename} from chunks.")
+        if input("Report malicious? (y/n): ") == 'y': safe_report(target_peer_id)
+        downloaded_chunks = [chunk for chunk, _ in chunks]
+        safe_register(MY_PEER_ID, downloaded_chunks)
+          
         #url = f"http://{target_ip}:{target_port}/download/{filename}" old logic
         #print(f"Downloading from {url}...")
-        try:
-            r = requests.get(url, timeout=10)
-            if r.status_code == 200:
-                with open(filename, 'wb') as f: f.write(r.content)
-                print("SUCCESS!")
-                safe_register(MY_PEER_ID, [filename])
-                if input("Report malicious? (y/n): ") == 'y': safe_report(target_peer_id)
-            else:
-                print(f"Failed: {r.status_code}")
-        except Exception as e:
-            print(f"Error: {e}")
+        #try:
+            #r = requests.get(url, timeout=10)
+            #if r.status_code == 200:
+                #with open(filename, 'wb') as f: f.write(r.content)
+                #print("SUCCESS!")
+                #safe_register(MY_PEER_ID, [filename])
+                #if input("Report malicious? (y/n): ") == 'y': safe_report(target_peer_id)
+            #else:
+                #print(f"Failed: {r.status_code}")
+        #except Exception as e:
+            #print(f"Error: {e}")
 
     elif command == '3':
         break
