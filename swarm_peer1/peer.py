@@ -6,34 +6,62 @@ import requests
 import os
 import sys
 from flask import Flask, send_from_directory
+
+# --- AWS CONFIGURATION ---
 PRIMARY_IP = "54.205.35.150" 
 BACKUP_IP  = "54.226.158.73" 
 PRIMARY_URL = f"http://{PRIMARY_IP}:8641"
 BACKUP_URL  = f"http://{BACKUP_IP}:8642"
-if len(sys.argv) > 1:
-    SERVER_PORT = int(sys.argv[1])
-else:
-    SERVER_PORT = 8643  #all peers on this random value unless specifed (for scripting)
 
-# Create connections
+SERVER_PORT = 8643 
 primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
 backup_server  = xmlrpc.client.ServerProxy(BACKUP_URL)
 
-def safe_register(ip, file_list):
+chunk_size = 256 * 1024  # 256KB
+
+def get_public_ip():
+    """ ASK AMAZON FOR MY REAL PUBLIC IP """
     try:
-        print(f"Registering with Primary ({PRIMARY_IP})...")
-        primary_server.P2P.register_files(ip, file_list)
+        return requests.get('https://checkip.amazonaws.com', timeout=5).text.strip()
+    except Exception:
+        return socket.gethostbyname(socket.gethostname())
+
+def safe_register(peer_id, file_list):
+    try:
+        print(f"Registering {peer_id} with Primary...")
+        primary_server.P2P.register_files(peer_id, file_list)
         print("Success: Connected to Primary.")
     except Exception as e:
-        print(f"Primary failed. Switching to BACKUP ({BACKUP_IP})...")
+        print(f"Primary failed. Switching to BACKUP...")
         try:
-            backup_server.P2P.register_files(ip, file_list)
+            backup_server.P2P.register_files(peer_id, file_list)
             print("Success: Connected to Backup.")
         except Exception:
             print("CRITICAL: Both servers are down.")
 
+def build_chunks(file_name): # to register chunked files, keeping old to ensure not to break anything
+    chunks = []
+    with open(file_name, 'rb') as f:
+        i = 0
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            chunk_filename = f"{file_name}.part{i}"
+            with open(chunk_filename, 'wb') as chunk_file:
+                chunk_file.write(chunk)
+            chunks.append(chunk_filename)
+            i += 1
+    return chunks
+
+def reassemble_file(filename, chunk_count):
+    with open(filename, 'wb') as out:
+        for i in range(chunk_count):
+            part = f"{filename}.part{i}"
+            with open(part, 'rb') as p:
+                out.write(p.read())
+
 def safe_search(filename):
-    #Tries Primary If fail, tries Backup.
     try:
         return primary_server.P2P.search_file(filename)
     except Exception:
@@ -43,6 +71,18 @@ def safe_search(filename):
         except Exception:
             print("Both servers down.")
             return []
+
+def safe_report(bad_peer_id):
+    try:
+        primary_server.P2P.report_user(bad_peer_id)
+        print("Reported to Primary.")
+    except Exception:
+        try:
+            backup_server.P2P.report_user(bad_peer_id)
+            print("Reported to Backup.")
+        except Exception:
+            pass
+
 app = Flask(__name__)
 FILE_DIRECTORY = "." 
 
@@ -50,7 +90,6 @@ FILE_DIRECTORY = "."
 def download_file(filename):
     try:
         if os.path.exists(filename):
-            print(f"\n[!] Peer requested '{filename}'. Sending...")
             return send_from_directory(FILE_DIRECTORY, filename, as_attachment=True)
         else:
             return "File not found", 404
@@ -58,109 +97,126 @@ def download_file(filename):
         return str(e), 500
 
 def start_flask_server():
-    # We listen on 0.0.0.0 to allow connections from other AWS machines
+    # Listen on 0.0.0.0 so the outside world can connect
     try:
         app.run(host='0.0.0.0', port=SERVER_PORT, debug=False, use_reloader=False)
     except Exception as e:
         print(f"ERROR starting file server: {e}")
 
-def safe_report(peer_ip):
-    # Report a malicious file transfer to the network
-    try:
-        primary_server.P2P.report_user(peer_ip)
-        print("Reported to Primary.")
-    except Exception:
-        print("Primary unreachable. Reporting on Backup...")
-        try:
-            backup_server.P2P.report_user(peer_ip)
-            print("Reported to Backup.")
-        except Exception:
-            print("Both servers down. Report failed.")
-
 hostname = socket.gethostname()
-my_ip = socket.gethostbyname(hostname)
+my_public_ip = get_public_ip()
 
-# start the File Server background thread
 server_thread = threading.Thread(target=start_flask_server)
 server_thread.daemon = True 
 server_thread.start()
-time.sleep(1) # give flask a second to start
+time.sleep(1)
 
 print(f"\n--- P2P NODE STARTED ---")
-print(f"My IP: {my_ip}")
-print(f"Listening on Port: {SERVER_PORT}")
+MY_PEER_ID = f"{my_public_ip}:{SERVER_PORT}"
+print(f"My Public ID: {MY_PEER_ID}")
 
 print("\nStep 1: Share Files")
-file_input = input("Enter filenames (comma separated): ")
-file_list = [f.strip() for f in file_input.split(',')]
+if sys.stdin.isatty():
+    file_input = input("Enter filenames (comma separated): ")
+else:
+    # If run by automation script, read from pipe
+    file_input = sys.stdin.readline().strip()
 
-safe_register(my_ip, file_list)
+#file_list = [f.strip() for f in file_input.split(',')]
+file_list = []
+for file in file_input.split(','):
+    file = file.strip()
+    if os.path.exists(file):
+        file_parts = build_chunks(file)
+        file_list.append({
+            "filename": file,
+            "chunks": len(file_parts),
+            "chunk_files": file_parts
+        })
+    else:
+        print(f"Warning: File '{file}' does not exist and will be skipped.")
+safe_register(MY_PEER_ID, file_list)
 
 while True: 
+    # If automated, sleep forever
+    if not sys.stdin.isatty():
+        time.sleep(99999)
+
     print("\n--- MENU ---")
-    print("1. SEARCH for a file")
-    print("2. DOWNLOAD a file")
-    print("3. LISTEN for incoming requests")
-    print("4. EXIT")
-    
+    print("1. SEARCH")
+    print("2. DOWNLOAD")
+    print("3. EXIT")
     command = input("Selection: ")
 
     if command == '1':
-        filename = input("Enter filename to search: ")
+        filename = input("Enter filename: ")
         peers = safe_search(filename)
-        if peers:
-            print(f"Peers with '{filename}': {peers}")
-        else:
-            print(f"No peers found.")
+        if peers: print(f"Found: {peers}")
+        else: print("Not found.")
 
     elif command == '2':
-        filename = input("Enter Filename to download: ")
-    
-        print(f"Locating '{filename}'...")
-        potential_peers = safe_search(filename) #call our mainserver method
-        
-        if not potential_peers:
-            print("File not found on network.")
-            continue
-        print(f"\nFound {len(potential_peers)} source(s):")
-        for i, peer_ip in enumerate(potential_peers):
-            print(f"[{i}] {peer_ip}")
-        try:
-            selection = int(input("\nEnter index of peer: "))
-            target_ip = potential_peers[selection]
-        except (ValueError, IndexError):
-            print("Invalid selection.")
+        filename = input("Enter Filename: ")
+        # potential_peers = safe_search(filename) old now we are using chunked
+        chunks = [] 
+        i = 0
+        while True: 
+            chunk_name = f"{filename}.part{i}"
+            potential_peers = safe_search(chunk_name)
+            if not potential_peers:
+                break
+            chunks.append((chunk_name, potential_peers))
+            i += 1
+        if not chunks:
+            print("Not found.")
             continue
             
-        url = f"http://{target_ip}:{SERVER_PORT}/download/{filename}"
-        print(f"Downloading from {target_ip}...")
-        
-        try:
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                if filename in file_list:
-                    overwrite = int(input("File already exists locally, you will overwrite is this okay? (1=Overwrite, 0=Do Not Overwrite): ")) #add overwrite prompt later
-                    if overwrite == 0:
-                        print("Download cancelled.")
-                        continue
+        #for i, p in enumerate(potential_peers):
+        #    print(f"[{i}] {p}")
+            
+        #try:
+        #    selection = int(input("Select peer index: "))
+        #    target_peer_id = potential_peers[selection]
+        #    target_ip, target_port = target_peer_id.split(':')
+        #except:
+            #continue
 
-                save_name = filename
-                with open(save_name, 'wb') as f:
-                    f.write(response.content)
-                print(f"SUCCESS! Saved as '{save_name}'")
-                safe_register(my_ip, [save_name.strip()]) #register new file with server
-                file_list.append(save_name.strip())
-                report = int(input("Report this as a malicious file transfer to the network? (1=Yes, 0=No): ")) #architecture for reporting
-                if report == 1:
-                    print("Reporting Peer") #architecture for reporting
-                    safe_report(target_ip)
+        #downloading chunked files from peers
+        for chunk_name, peers in chunks:
+            print(f"Downloading chunk {chunk_name}...")
+            for peer in peers:
+                target_ip, target_port = peer.split(':')
+                url = f"http://{target_ip}:{target_port}/download/{chunk_name}"
+                print(f"Trying {url}...")
+                try:
+                    r = requests.get(url, timeout=10)
+                    if r.status_code == 200:
+                        with open(chunk_name, 'wb') as f: f.write(r.content)
+                        print(f"Downloaded chunk {chunk_name} from {peer}")
+                        break
+                except Exception as e:
+                    print(f"Error: {e}")
             else:
-                print(f"Failed. Status: {response.status_code}")
-        except Exception as e:
-            print(f"Download Error: {e}")
+                print(f"Failed to download chunk {chunk_name} from all peers.")
+                continue 
+        reassemble_file(filename, len(chunks))
+        print(f"Reassembled file {filename} from chunks.")
+        if input("Report malicious? (y/n): ") == 'y': safe_report(target_peer_id)
+        downloaded_chunks = [chunk for chunk, _ in chunks]
+        safe_register(MY_PEER_ID, downloaded_chunks)
+          
+        #url = f"http://{target_ip}:{target_port}/download/{filename}" old logic
+        #print(f"Downloading from {url}...")
+        #try:
+            #r = requests.get(url, timeout=10)
+            #if r.status_code == 200:
+                #with open(filename, 'wb') as f: f.write(r.content)
+                #print("SUCCESS!")
+                #safe_register(MY_PEER_ID, [filename])
+                #if input("Report malicious? (y/n): ") == 'y': safe_report(target_peer_id)
+            #else:
+                #print(f"Failed: {r.status_code}")
+        #except Exception as e:
+            #print(f"Error: {e}")
+
     elif command == '3':
-        print(f"Listening... (Press Ctrl+C to stop)")
-        while True:
-            time.sleep(1)
-    elif command == '4':
         break
