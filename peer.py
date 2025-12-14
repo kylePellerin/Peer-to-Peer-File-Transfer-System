@@ -128,7 +128,11 @@ for file in file_input.split(','):
     file = file.strip()
     if os.path.exists(file):
         file_parts = build_chunks(file)
-        file_list.extend(file_parts)
+        file_list.append({
+            "filename": file,
+            "chunks": len(file_parts),
+            "chunk_files": file_parts
+        })
     else:
         print(f"Warning: File '{file}' does not exist and will be skipped.")
 safe_register(MY_PEER_ID, file_list)
@@ -172,9 +176,9 @@ while True:
         #try:
         #    selection = int(input("Select peer index: "))
         #    target_peer_id = potential_peers[selection]
-            target_ip, target_port = target_peer_id.split(':')
-        except:
-            continue
+        #    target_ip, target_port = target_peer_id.split(':')
+        #except:
+            #continue
 
         #downloading chunked files from peers
         for chunk_name, peers in chunks:
