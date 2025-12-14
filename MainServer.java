@@ -88,7 +88,6 @@ public class MainServer {
   public Map<String, Object[]> get_all_files() { //get all files from filelist for the sync method above
       System.out.println("Sync request received: Sending file list.");
       Map<String, Object[]> exportData = new HashMap<>();
-      System.out.println("stored in file list: " + fileLists.keySet().toString());
       synchronized(fileLists) {
           for (String filename : fileLists.keySet()) {
               ArrayList<String> ips = fileLists.get(filename).getFiles();
