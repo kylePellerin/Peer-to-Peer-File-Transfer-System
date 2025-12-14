@@ -183,6 +183,10 @@ while True:
         CHUNK_SIZE = 1024 * 1024 
         num_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
         
+        if os.path.exists(filename): #if file exists, ask to overwrite
+            if input("File exists. Overwrite? (1=Yes, 0=No): ") != "1":
+                continue
+
         #Create a file of the correct size to write into
         with open(filename, "wb") as f:
             f.seek(file_size - 1)
