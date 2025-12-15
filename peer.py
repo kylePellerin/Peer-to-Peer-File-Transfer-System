@@ -5,6 +5,7 @@ import time
 import requests
 import os
 import sys
+import concurrent.futures
 from flask import Flask, send_from_directory
 
 # --- AWS CONFIGURATION ---
@@ -192,34 +193,43 @@ while True:
             f.seek(file_size - 1)
             f.write(b"\0")
 
-        print(f"Starting download of {num_chunks} chunks from {len(peers)} peers...")
+        # DYNAMIC THREAD COUNT: 
+        # Use 1 thread per peer, up to a max of 10 (to prevent crashing the OS)
+        num_threads = min(len(peers), 10)
+        
+        print(f"Starting PARALLEL download of {num_chunks} chunks from {len(peers)} peers using {num_threads} threads...")
 
-        for i in range(num_chunks):
+        def download_chunk(i):
             start_byte = i * CHUNK_SIZE
             end_byte = min((i + 1) * CHUNK_SIZE - 1, file_size - 1)
             
-            # Round Robin: Pick peer based on chunk index
+            # Round Robin, distribute chunks evenly across all peers
             peer_index = i % len(peers)
             current_peer = peers[peer_index]
             
             ip, port = current_peer.split(':')
             download_url = f"http://{ip}:{port}/download/{filename}"
-            
             headers = {"Range": f"bytes={start_byte}-{end_byte}"}
-            
-            print(f"Downloading chunk {i+1}/{num_chunks} ({start_byte}-{end_byte}) from {current_peer}...")
+
+            # print(f"Downloading chunk {i+1} from {current_peer}...") # Optional: Comment out to reduce spam
             
             try:
                 r = requests.get(download_url, headers=headers, timeout=10)
-                
                 if r.status_code == 206 or r.status_code == 200:
-                    with open(filename, "r+b") as f: # Open in Read+Binary mode to seek
+                    with open(filename, "r+b") as f:
                         f.seek(start_byte)
                         f.write(r.content)
+                    return True
                 else:
-                    print(f"Failed to get chunk {i} from {current_peer}. Status: {r.status_code}")
+                    print(f"Failed chunk {i} from {current_peer}: {r.status_code}")
+                    return False
             except Exception as e:
-                print(f"Exception downloading chunk {i}: {e}")
+                print(f"Error chunk {i}: {e}")
+                return False
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = [executor.submit(download_chunk, i) for i in range(num_chunks)]
+            concurrent.futures.wait(futures)
 
         print("Download complete.")
         

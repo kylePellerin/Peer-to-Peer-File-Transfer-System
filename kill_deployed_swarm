@@ -1,0 +1,10 @@
+#!/bin/bash
+NODES=("107.23.190.249" "3.144.239.184" "54.151.0.141" "35.159.30.5" "35.72.34.224")
+USER="kpellerin"
+
+echo "--- KILLING SWARM ---"
+for IP in "${NODES[@]}"; do
+    echo "Stopping $IP..."
+    ssh -o StrictHostKeyChecking=no $USER@$IP "pkill -f peer.py"
+done
+echo "Done."
