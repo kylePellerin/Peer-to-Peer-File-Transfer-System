@@ -9,6 +9,7 @@ import java.util.Vector;
 import java.util.HashSet;
 import java.util.*;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 public class MainServer {
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); 
@@ -182,5 +183,37 @@ public String report_user(String badUserIp) {
                 return new Vector<String>(); 
             }
         }
+    }
+
+    public String unregister_client(String clientIp) {
+        System.out.println("Unregister request from " + clientIp);
+        
+        synchronized(fileLists) {
+            Iterator<Map.Entry<String, FileList>> it = fileLists.entrySet().iterator();
+            
+            while (it.hasNext()) {
+                Map.Entry<String, FileList> entry = it.next();
+                FileList fl = entry.getValue();
+                fl.removeFile(clientIp); 
+                if (fl.getFiles().isEmpty()) {
+                    it.remove();
+                }
+            }
+        }
+
+        if (backupServerIp != null) { 
+            try {
+                System.out.println("Replicating unregister to backup...");
+                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+                config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
+                XmlRpcClient client = new XmlRpcClient();
+                client.setConfig(config);
+                Object[] params = new Object[]{clientIp};
+                client.execute("P2P.unregister_client", params);
+            } catch (Exception e) {
+                System.out.println("Unregister Replication FAILED: " + e.getMessage());
+            }
+        }
+        return "Client Unregistered";
     }
 }

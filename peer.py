@@ -38,6 +38,15 @@ def safe_register(peer_id, file_list):
         except Exception:
             print("CRITICAL: Both servers are down.")
 
+def safe_unregister(peer_id):
+    try:
+        primary_server.P2P.unregister_client(peer_id)
+    except Exception:
+        try:
+            backup_server.P2P.unregister_client(peer_id)
+        except Exception:
+            pass
+
 def build_chunks(file_name): # to register chunked files, keeping old to ensure not to break anything
     chunks = []
     with open(file_name, 'rb') as f:
@@ -237,4 +246,6 @@ while True:
         safe_register(MY_PEER_ID, [filename])
 
     elif command == '3':
+        print("Exiting...")
+        safe_unregister(MY_PEER_ID)
         break
