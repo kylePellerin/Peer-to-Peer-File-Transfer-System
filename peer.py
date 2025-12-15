@@ -15,6 +15,7 @@ PRIMARY_URL = f"http://{PRIMARY_IP}:8641"
 BACKUP_URL  = f"http://{BACKUP_IP}:8642"
 
 SERVER_PORT = 8643 
+CHUNK_SIZE = 1024 * 1024 #just 1mb 
 primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
 backup_server  = xmlrpc.client.ServerProxy(BACKUP_URL)
 
@@ -189,8 +190,6 @@ while True:
             print("File is empty or size unknown.")
             continue
 
-        #Chunk Size
-        CHUNK_SIZE = 1024 * 1024 
         num_chunks = (file_size + CHUNK_SIZE - 1) // CHUNK_SIZE
         
         if os.path.exists(filename): #if file exists, ask to overwrite
