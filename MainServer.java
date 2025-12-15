@@ -49,6 +49,27 @@ public class MainServer {
     }
   }
 
+  private void notifyBackup(String methodName, Object[] params) {
+      if (backupServerIp == null) {
+          return;
+      }
+      try {
+          System.out.println("Replicating " + methodName + " to backup...");
+          
+          XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
+          config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
+          
+          XmlRpcClient client = new XmlRpcClient();
+          client.setConfig(config);
+          
+          client.execute(methodName, params);
+          
+      } catch (Exception e) {
+          // We print the method name so we know which action failed
+          System.out.println("Backup Replication Failed (" + methodName + "): " + e.getMessage());
+      }
+  }
+
   private static void syncWithBackup() { //if the main goes down and backup logs stuff we need to update main when it comes back online so we call this
       try {
           System.out.println("Attempting to sync state from Backup...");
@@ -129,13 +150,7 @@ public class MainServer {
         if (backupServerIp != null) { //if we have a backoup were gonna write to it
             try {
                 System.out.println("Replicating to backup");
-                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-                config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
-                XmlRpcClient client = new XmlRpcClient();
-                client.setConfig(config);
-                // call method on backup server
-                Object[] params = new Object[]{clientIp, fileList};
-                client.execute("P2P.register_files", params);
+                notifyBackup("P2P.register_files", new Object[]{clientIp, fileList});
                 System.out.println("Replication success.");
             } catch (Exception e) {
                 System.out.println("Replication FAILED: " + e.getMessage());
@@ -159,12 +174,8 @@ public String report_user(String badUserIp) {
         if (backupServerIp != null) { 
             try {
                 System.out.println("Replicating blacklist to backup...");
-                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-                config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
-                XmlRpcClient client = new XmlRpcClient();
-                client.setConfig(config);
-                Object[] params = new Object[]{badUserIp};
-                client.execute("P2P.report_user", params);
+                notifyBackup("P2P.report_user", new Object[]{badUserIp});
+                System.out.println("Blacklist Replication success.");
             } catch (Exception e) {
                 System.out.println("Blacklist Replication FAILED: " + e.getMessage());
             }
@@ -204,12 +215,7 @@ public String report_user(String badUserIp) {
         if (backupServerIp != null) { 
             try {
                 System.out.println("Replicating unregister to backup...");
-                XmlRpcClientConfigImpl config = new XmlRpcClientConfigImpl();
-                config.setServerURL(new URL("http://" + backupServerIp + ":" + backupServerPort));
-                XmlRpcClient client = new XmlRpcClient();
-                client.setConfig(config);
-                Object[] params = new Object[]{clientIp};
-                client.execute("P2P.unregister_client", params);
+                notifyBackup("P2P.unregister_client", new Object[]{clientIp});
             } catch (Exception e) {
                 System.out.println("Unregister Replication FAILED: " + e.getMessage());
             }
