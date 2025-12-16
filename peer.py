@@ -14,7 +14,10 @@ BACKUP_IP  = "54.226.158.73"
 PRIMARY_URL = f"http://{PRIMARY_IP}:8641"
 BACKUP_URL  = f"http://{BACKUP_IP}:8642"
 
-SERVER_PORT = 8643 
+if len(sys.argv) > 1:
+    SERVER_PORT = int(sys.argv[1])
+else:
+    SERVER_PORT = 8643
 CHUNK_SIZE = 1024 * 1024 #just 1mb 
 primary_server = xmlrpc.client.ServerProxy(PRIMARY_URL)
 backup_server  = xmlrpc.client.ServerProxy(BACKUP_URL)
@@ -95,6 +98,34 @@ def safe_report(bad_peer_id):
 app = Flask(__name__)
 FILE_DIRECTORY = "." 
 
+def rank_peers_by_latency(peers, filename):
+    print(f"   [Speed Test] Benchmarking {len(peers)} peers...")
+    ranked_results = []
+
+    def check_speed(peer):
+        ip, port = peer.split(':')
+        url = f"http://{ip}:{port}/download/{filename}"
+        try:
+            start = time.time()
+            # just get headers
+            requests.head(url, timeout=2) 
+            latency = time.time() - start
+            return (latency, peer)
+        except:
+            return (999, peer) # If it fails, treat as super slow
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        results = list(executor.map(check_speed, peers))
+
+    # sort by latency (lowest first)
+    results.sort(key=lambda x: x[0])
+    # extract just the peer strings
+    sorted_peers = [r[1] for r in results if r[0] < 999]
+    print(f"   [Speed Test] Top 3 Fastest Peers:")
+    for i in range(min(3, len(sorted_peers))):
+        print(f" #{i+1}: {sorted_peers[i]} ({results[i][0]:.3f}s)")
+         
+    return sorted_peers
+
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
@@ -167,8 +198,19 @@ while True:
             print("File not found on any peer.")
             continue
 
-        print(f"Found {len(peers)} peers with this file: {peers}")
+        print(f"Found {len(peers)} peers. Ranking by speed...")
+        #Use latency sort
+        peers = rank_peers_by_latency(peers, filename)
+        
+        if not peers:
+            print("All peers unreachable.")
+            continue
 
+        if len(peers) > 5:
+            # Keep only the Top 10 (or Top 50%) prefomring peers 
+            cutoff = max(10, int(len(peers) * 0.5))
+            print(f"Optimization: Dropping {len(peers) - cutoff} slow peers. Keeping Top {cutoff}.")
+            peers = peers[:cutoff]
         #Get File Size from the first available peer
         file_size = 0
         try:
@@ -210,8 +252,6 @@ while True:
         def download_chunk(i):
             start_byte = i * CHUNK_SIZE
             end_byte = min((i + 1) * CHUNK_SIZE - 1, file_size - 1)
-            
-            # Round Robin, distribute chunks evenly across all peers
             peer_index = i % len(peers)
             current_peer = peers[peer_index]
             
@@ -240,7 +280,12 @@ while True:
             concurrent.futures.wait(futures)
 
         print("Download complete.")
-        
+        if input("Do you want to report this file transfer? (1=Yes, 0=No): ") == "1":
+            for peer in peers:
+                if peer == MY_PEER_ID: #don't report yourself
+                    continue
+                print("Reporting bad peer:", peer)
+                safe_report(peer)
         # Register that we now have the file so we can serve it to others
         safe_register(MY_PEER_ID, [filename])
 

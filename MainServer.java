@@ -132,7 +132,7 @@ public class MainServer {
   }
 
   public String register_files(String clientIp, Object[] fileList) {
-    if (isBlacklisted(clientIp)) {
+    if (isBlacklisted(clientIp)) { //if blacklisted they can't register
             System.out.println("Blocked register request from blacklisted IP: " + clientIp);
             return "Error: You are blacklisted.";
         }
