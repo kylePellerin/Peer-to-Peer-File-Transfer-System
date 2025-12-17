@@ -29,12 +29,13 @@ def get_public_ip():
     except Exception:
         return socket.gethostbyname(socket.gethostname())
 
-def safe_register(peer_id, file_list):
+#First trying to connect to main server, if fails, try backup.
+def safe_register(peer_id, file_list): 
     try:
         print(f"Registering {peer_id} with Primary...")
         primary_server.P2P.register_files(peer_id, file_list)
         print("Success: Connected to Primary.")
-    except Exception as e:
+    except Exception as e: #attempting backup
         print(f"Primary failed. Switching to BACKUP...")
         try:
             backup_server.P2P.register_files(peer_id, file_list)
@@ -42,6 +43,7 @@ def safe_register(peer_id, file_list):
         except Exception:
             print("CRITICAL: Both servers are down.")
 
+#unregister from both servers safely.
 def safe_unregister(peer_id):
     try:
         primary_server.P2P.unregister_client(peer_id)
@@ -51,6 +53,7 @@ def safe_unregister(peer_id):
         except Exception:
             pass
 
+#Search for filename on primary server, if fails we will try on the backuo.
 def safe_search(filename):
     try:
         return primary_server.P2P.search_file(filename)
@@ -58,10 +61,11 @@ def safe_search(filename):
         print("Primary unreachable. Searching on Backup...")
         try:
             return backup_server.P2P.search_file(filename)
-        except Exception:
+        except Exception: #should both be down unable to search.
             print("Both servers down.")
             return []
 
+#reporting a malicious peer to the server attempting to contact each server.
 def safe_report(bad_peer_id):
     try:
         primary_server.P2P.report_user(bad_peer_id)
@@ -76,6 +80,7 @@ def safe_report(bad_peer_id):
 app = Flask(__name__)
 FILE_DIRECTORY = "." 
 
+#calculate latency to each peer and rank them. choosing the best half of the list of peers
 def rank_peers_by_latency(peers, filename):
     print(f"   [Speed Test] Benchmarking {len(peers)} peers...")
     ranked_results = []
@@ -114,6 +119,7 @@ def download_file(filename):
     except Exception as e:
         return str(e), 500
 
+#starting of the peer server, prompting for files to share and then communicating with both servers
 def start_flask_server():
     # Listen on 0.0.0.0 so the outside world can connect
     try:
@@ -152,6 +158,7 @@ for file in file_input.split(','):
 # Send the list of strings (whole filenames) to the server
 safe_register(MY_PEER_ID, files_to_register)
 
+#our main loop logic for commands from the user 
 while True: 
     if not sys.stdin.isatty():
         time.sleep(99999)
@@ -177,7 +184,7 @@ while True:
             continue
 
         print(f"Found {len(peers)} peers. Ranking by speed...")
-        #Use latency sort
+        #Use latency sort for best peers
         peers = rank_peers_by_latency(peers, filename)
         
         if not peers:
