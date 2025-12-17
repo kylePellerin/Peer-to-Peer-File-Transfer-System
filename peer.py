@@ -51,27 +51,27 @@ def safe_unregister(peer_id):
         except Exception:
             pass
 
-def build_chunks(file_name): # to register chunked files, keeping old to ensure not to break anything
-    chunks = []
-    with open(file_name, 'rb') as f:
-        i = 0
-        while True:
-            chunk = f.read(chunk_size)
-            if not chunk:
-                break
-            chunk_filename = f"{file_name}.part{i}"
-            with open(chunk_filename, 'wb') as chunk_file:
-                chunk_file.write(chunk)
-            chunks.append(chunk_filename)
-            i += 1
-    return chunks
+# def build_chunks(file_name): # to register chunked files, keeping old to ensure not to break anything
+#     chunks = []
+#     with open(file_name, 'rb') as f:
+#         i = 0
+#         while True:
+#             chunk = f.read(chunk_size)
+#             if not chunk:
+#                 break
+#             chunk_filename = f"{file_name}.part{i}"
+#             with open(chunk_filename, 'wb') as chunk_file:
+#                 chunk_file.write(chunk)
+#             chunks.append(chunk_filename)
+#             i += 1
+#     return chunks
 
-def reassemble_file(filename, chunk_count):
-    with open(filename, 'wb') as out:
-        for i in range(chunk_count):
-            part = f"{filename}.part{i}"
-            with open(part, 'rb') as p:
-                out.write(p.read())
+# def reassemble_file(filename, chunk_count):
+#     with open(filename, 'wb') as out:
+#         for i in range(chunk_count):
+#             part = f"{filename}.part{i}"
+#             with open(part, 'rb') as p:
+#                 out.write(p.read())
 
 def safe_search(filename):
     try:
