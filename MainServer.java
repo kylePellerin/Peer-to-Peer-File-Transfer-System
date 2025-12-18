@@ -14,7 +14,7 @@ import java.util.Iterator;
 public class MainServer {
   private static HashMap<String, FileList> fileLists = new HashMap<String, FileList>(); 
   private static HashSet<String> blackList = new HashSet<String>();
-  private static String backupServerIp = null;
+  private static String backupServerIp = null; //passed in during init 
   private static int backupServerPort = 8642;
   private static int mainPort = 8641;
 
@@ -22,15 +22,15 @@ public class MainServer {
   public static void main(String[] args) {
     try {
     if (args.length > 0) {
-        mainPort = Integer.parseInt(args[0]);
+        mainPort = Integer.parseInt(args[0]); 
     }
     if (args.length == 3) {
         backupServerIp = args[1];
         backupServerPort = Integer.parseInt(args[2]);
         System.out.println("Backup server set to " + backupServerIp + ":" + backupServerPort);
-        syncWithBackup(); //if backup has logs we need to get them in case of main restart
+        syncWithBackup(); //if backup has logs we need to get them in case of main restart, so sync on main start
     }else {
-        System.out.println("No backup server configured, running as a standalone.");
+        System.out.println("No backup server configured, running as a standalone."); 
     }
     System.out.println("Attempting to start Server...");
     WebServer server = new WebServer(mainPort); 
@@ -38,7 +38,7 @@ public class MainServer {
     XmlRpcServer xmlRpcServer = server.getXmlRpcServer();
     PropertyHandlerMapping phm = new PropertyHandlerMapping();
     
-    // This tells the server to make a new MainServer object for every request
+    // This tells the server to make a new MainServer object for every request, so backup is a main server insance technically
     phm.addHandler("P2P", MainServer.class);
     
     xmlRpcServer.setHandlerMapping(phm);
@@ -49,7 +49,7 @@ public class MainServer {
     }
   }
 
-  private void notifyBackup(String methodName, Object[] params) {
+  private void notifyBackup(String methodName, Object[] params) { //generic method used during writes to the backup to open a connection
       if (backupServerIp == null) {
           return;
       }
@@ -65,7 +65,6 @@ public class MainServer {
           client.execute(methodName, params);
           
       } catch (Exception e) {
-          // We print the method name so we know which action failed
           System.out.println("Backup Replication Failed (" + methodName + "): " + e.getMessage());
       }
   }
@@ -84,7 +83,7 @@ public class MainServer {
               synchronized(fileLists) {
                   for (String filename : rawFiles.keySet()) {
                       Object[] ips = rawFiles.get(filename);
-                      FileList fl = new FileList();
+                      FileList fl = new FileList(); //create a new file list and put it in main, populate with backup's info
                       for (Object ip : ips) {
                           fl.addFile((String)ip);
                       }
@@ -95,7 +94,7 @@ public class MainServer {
           }
 
           Object[] blockedUsers = (Object[]) client.execute("P2P.get_black_list", new Object[]{});
-          synchronized(blackList) { //rebuild blacklist from backup
+          synchronized(blackList) { //rebuild blacklist from backup, but this time we can just copy over
               for (Object ip : blockedUsers) {
                   blackList.add((String)ip);
               }
@@ -147,7 +146,7 @@ public class MainServer {
                 fileLists.get(filename).addFile(clientIp);
             }
         }
-        if (backupServerIp != null) { //if we have a backoup were gonna write to it
+        if (backupServerIp != null) { //if we have a backup were gonna write to it
             try {
                 System.out.println("Replicating to backup");
                 notifyBackup("P2P.register_files", new Object[]{clientIp, fileList});
@@ -157,7 +156,6 @@ public class MainServer {
                 // don't crash just log because primary alive
             }
         }
-
         return "Files Registered";
     }
     
@@ -180,11 +178,10 @@ public String report_user(String badUserIp) {
                 System.out.println("Blacklist Replication FAILED: " + e.getMessage());
             }
         }
-        
         return "User Blacklisted";
     }
 
-    public Vector<String> search_file(String filename) {
+    public Vector<String> search_file(String filename) { //to search for a file in the file list
         System.out.println("Search request for: " + filename);
         
         synchronized(fileLists) {
@@ -196,7 +193,7 @@ public String report_user(String badUserIp) {
         }
     }
 
-    public String unregister_client(String clientIp) {
+    public String unregister_client(String clientIp) { //when a peer presses 3 in the menu, they discconect safely using this
         System.out.println("Unregister request from " + clientIp);
         
         synchronized(fileLists) {
