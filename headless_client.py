@@ -3,7 +3,7 @@ import time
 import requests
 import concurrent.futures
 import argparse
-
+# a python file we used for testing our client, it downloads a file from multiple peers in parallel. This code is a basically a copy of our peer but with limited functionality and stripped back methods for easier testing
 CHUNK_SIZE = 1024 * 1024  # 1MB
 SERVER_PORT = 8643
 
